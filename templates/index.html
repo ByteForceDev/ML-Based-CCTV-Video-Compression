@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntelliVision | Smart CCTV Summariser</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>IntelliVision</h1>
+            </div>
+            <p>Upload your CCTV footage or sequence of images. Our advanced YOLOv8 AI will detect critical events, remove dead time, and extract meaningful summaries automatically.</p>
+        </header>
+
+        <main>
+            <div class="upload-card">
+                <div id="drop-zone" class="drop-zone">
+                    <div class="upload-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </div>
+                    <h2>Drag & Drop your media here</h2>
+                    <p class="file-types">Supports MP4, AVI, MOV, JPG, PNG</p>
+                    <input type="file" id="file-input" class="file-input" accept="video/mp4,video/x-m4v,video/*,image/*">
+                    <button class="btn-primary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                </div>
+
+                <div id="upload-progress-container" class="progress-section hidden">
+                    <div class="progress-header">
+                        <span class="progress-title">Uploading...</span>
+                        <span id="upload-percentage" class="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div id="upload-progress-bar" class="progress-bar-fill upload-fill"></div>
+                    </div>
+                </div>
+
+                <div id="processing-progress-container" class="progress-section hidden">
+                    <div class="progress-header">
+                        <span class="progress-title">Analyzing Footage with YOLOv8...</span>
+                        <span id="processing-percentage" class="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-stats">
+                        <span id="events-detected">0 Events Detected</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div id="processing-progress-bar" class="progress-bar-fill processing-fill"></div>
+                    </div>
+                    <div class="terminal-log" id="log-output">
+                        Waiting for output...
+                    </div>
+                </div>
+            </div>
+
+            <div id="results-container" class="results-container hidden">
+                <div class="results-header">
+                    <h3>Extracted Event Highlights</h3>
+                    <div class="header-actions">
+                        <a id="btn-download-zip" href="#" class="btn-secondary">📦 Download All (ZIP)</a>
+                        <a id="btn-download-log" href="#" class="btn-secondary">📄 Event Log</a>
+                    </div>
+                </div>
+                
+                <div id="stats-panel" class="stats-panel">
+                    <div class="stat-item">
+                        <span class="stat-label">Original Video Length</span>
+                        <span id="stat-orig-len" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Extracted Length</span>
+                        <span id="stat-extracted-len" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Input Size</span>
+                        <span id="stat-input-size" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Extracted Size</span>
+                        <span id="stat-output-size" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Size Reduction</span>
+                        <span id="stat-reduction" class="stat-value reduction-highlight">--</span>
+                    </div>
+                </div>
+
+                <div id="clips-grid" class="clips-grid">
+                    <!-- Event clips will be injected here via JavaScript -->
+                </div>
+            </div>
+            
+            <div id="history-container" class="history-container">
+                <h3>Already Extracted Videos</h3>
+                <div id="history-list" class="history-list">
+                    <!-- History tasks injected here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+</body>
+</html>

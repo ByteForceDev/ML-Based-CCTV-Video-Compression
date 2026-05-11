@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files (large datasets)
+data/**
+
+# Model files (can be large)
+*.pkl
+*.h5
+*.pt
+*.pth
+*.ckpt
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Results (optional - comment out if you want to commit results)
+# results/*.png
+# results/*.csv
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Input / output videos (too large for GitHub)
+*.mp4
+*.avi
+*.mkv
+output/**
+
+# Web App specifics
+uploads/
+__pycache__/
+
+main.css
+README.pdf
