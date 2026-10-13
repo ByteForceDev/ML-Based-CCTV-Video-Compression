@@ -9,5 +9,6 @@ imageio-ffmpeg>=0.4.9
 torch>=2.0.0
 torchvision>=0.15.0
 
-flask 
+flask
 werkzeug
+rich>=13.0.0
