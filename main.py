@@ -291,10 +291,12 @@ def run(
     # ── Print header ──────────────────────────────────────────────────
     SEP = "─" * 62
     print(f"\n{SEP}")
-    print(f"  Input       : {input_path}")
+    print(f"  Input Video : {input_path}")
     print(f"  Clips saved : {clips_dir}/")
-    print(f"  Video       : {width}×{height}  {video_fps:.1f}fps  "
+    print(f"  Input Res   : {width}x{height}  @  {video_fps:.1f}fps  "
           f"{_fmt(total_frames / video_fps)}")
+    print(f"  Output Res  : {width}x{height}  @  {clip_write_fps:.1f}fps"
+          f"{f' ({speedup_factor:.1f}x speed-up)' if speedup_factor > 1.01 else ''}")
     if target_frames < total_frames:
         print(f"  Test mode   : {pct:.1f}%  ({target_frames:,}/{total_frames:,} frames)")
     print(f"  Pre/Post    : {config.PRE_ROLL_SECONDS}s / {config.POST_ROLL_SECONDS}s"
@@ -314,7 +316,16 @@ def run(
     model = YOLO(config.YOLO_MODEL)
     model.to(device)
     print(f"[Stage-2] Model ready on {device}\n")
-    if progress_callback: progress_callback({'log': '[Stage-2] YOLOv8 Model Loaded', 'progress': 0, 'events': 0})
+    if progress_callback:
+        progress_callback({
+            'log': f'[Stage-2] YOLOv8 Loaded | Input: {width}x{height} @ {video_fps:.1f}fps | Output: {width}x{height} @ {clip_write_fps:.1f}fps',
+            'progress': 0,
+            'events': 0,
+            'input_res': f"{width}x{height}",
+            'output_res': f"{width}x{height}",
+            'input_fps': f"{video_fps:.1f} fps",
+            'output_fps': f"{clip_write_fps:.1f} fps",
+        })
 
     print()  # blank line before first progress / event
 
@@ -602,6 +613,10 @@ def run(
                  f"  ({target_frames:,} frames @ {video_fps:.1f} fps)\n")
         fh.write(f"Extracted  : {_fmt(extracted_seconds)}\n")
         fh.write(f"Events     : {event_num}\n")
+        fh.write(f"Input Res  : {width}x{height}\n")
+        fh.write(f"Output Res : {width}x{height}\n")
+        fh.write(f"Input FPS  : {video_fps:.1f} fps\n")
+        fh.write(f"Output FPS : {clip_write_fps:.1f} fps\n")
         fh.write("Stage-3    : heuristic trigger\n")
         if target_frames < total_frames:
             fh.write(f"Mode       : test ({pct:.1f}% of input)\n")
@@ -631,6 +646,10 @@ def run(
     print("  Stage-3 mode       : heuristic trigger")
     print(f"  Compression mode   : {compression_mode}")
     print(f"  Key events found   : {event_num}")
+    print(f"  Input Resolution   : {width}x{height}")
+    print(f"  Output Resolution  : {width}x{height}")
+    print(f"  Input FPS          : {video_fps:.1f} fps")
+    print(f"  Output FPS         : {clip_write_fps:.1f} fps")
     print(f"  Frames kept        : {frames_saved_total:,} / {n_read:,}  ({frames_pct_kept:.1f}%)")
     if speedup_factor > 1.01:
         print(f"  FPS boost          : {video_fps:.1f}fps → {clip_write_fps:.0f}fps  ({speedup_factor:.1f}x speed-up)")
@@ -650,6 +669,18 @@ def run(
     else:
         print("\n  No key events detected in this video.")
     print()
+    return {
+        'original_length': _fmt(target_frames / video_fps),
+        'extracted_length': _fmt(extracted_seconds),
+        'input_size': f"{input_mb:.1f} MB",
+        'output_size': f"{clips_mb:.1f} MB",
+        'reduction': f"{reduction_pct:.1f}%",
+        'input_resolution': f"{width}x{height}",
+        'output_resolution': f"{width}x{height}",
+        'input_fps': f"{video_fps:.1f} fps",
+        'output_fps': f"{clip_write_fps:.1f} fps",
+        'events': event_num,
+    }
 
 # ── Entry point ─────────────────────────────────────────────────────────
 

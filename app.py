@@ -1,11 +1,14 @@
-import re
-import threading
-import subprocess
-import uuid
+import json
 import os
+import re
+import shutil
+import subprocess
+import threading
+import uuid
+from datetime import datetime
+from pathlib import Path
 from flask import Flask, request, render_template, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
-from pathlib import Path
 import config
 
 app = Flask(__name__)
@@ -22,6 +25,79 @@ app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
 # In-memory session tracking for progress
 tasks = {}
 
+def extract_stats(out_dir):
+    stats = {}
+    log_path = os.path.join(out_dir, "event_log.txt")
+    if os.path.exists(log_path):
+        with open(log_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            m = re.search(r'Processed\s*:\s*([\d:]+)', content)
+            if m: stats['original_length'] = m.group(1)
+            
+            m = re.search(r'Extracted\s*:\s*([\d:]+)', content)
+            if m: stats['extracted_length'] = m.group(1)
+            
+            m = re.search(r'Input video\s*:\s*([\d\.]+\s*MB)', content)
+            if m: stats['input_size'] = m.group(1)
+                
+            m = re.search(r'All clips\s*:\s*([\d\.]+\s*MB)', content)
+            if m: stats['output_size'] = m.group(1)
+                
+            m = re.search(r'Size reduction\s*:\s*([\d\.]+%)', content)
+            if m: stats['reduction'] = m.group(1)
+
+            m = re.search(r'Input Res\s*:\s*([^\r\n]+)', content)
+            if m: stats['input_resolution'] = m.group(1).strip()
+
+            m = re.search(r'Output Res\s*:\s*([^\r\n]+)', content)
+            if m: stats['output_resolution'] = m.group(1).strip()
+
+            m = re.search(r'Input FPS\s*:\s*([^\r\n]+)', content)
+            if m:
+                stats['input_fps'] = m.group(1).strip()
+            else:
+                m_fps = re.search(r'@\s*([\d\.]+)\s*fps', content)
+                if m_fps:
+                    stats['input_fps'] = f"{m_fps.group(1)} fps"
+
+            m = re.search(r'Output FPS\s*:\s*([^\r\n]+)', content)
+            if m:
+                stats['output_fps'] = m.group(1).strip()
+            else:
+                m_boost = re.search(r'FPS boost\s*:\s*[\d\.]+fps\s*→\s*([\d\.]+)fps', content)
+                if m_boost:
+                    stats['output_fps'] = f"{m_boost.group(1)} fps"
+                elif 'input_fps' in stats:
+                    stats['output_fps'] = stats['input_fps']
+
+    # Fallback to probe clips if resolution/fps not found in older logs
+    if not stats.get('output_resolution') or not stats.get('output_fps'):
+        try:
+            import cv2
+            for f in os.listdir(out_dir):
+                if f.endswith('.mp4') and not f.endswith('.raw.mp4'):
+                    cpath = os.path.join(out_dir, f)
+                    vcap = cv2.VideoCapture(cpath)
+                    if vcap.isOpened():
+                        cw = int(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        ch = int(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        cfps = vcap.get(cv2.CAP_PROP_FPS) or 25.0
+                        vcap.release()
+                        if cw > 0 and ch > 0:
+                            if not stats.get('output_resolution'):
+                                stats['output_resolution'] = f"{cw}x{ch}"
+                            if not stats.get('input_resolution'):
+                                stats['input_resolution'] = f"{cw}x{ch}"
+                            if not stats.get('output_fps'):
+                                stats['output_fps'] = f"{cfps:.1f} fps"
+                            if not stats.get('input_fps'):
+                                stats['input_fps'] = f"{cfps:.1f} fps"
+                        break
+        except Exception:
+            pass
+
+    return stats
+
 def process_video(task_id, filename):
     # Use absolute paths for robust resolution in background threads
     input_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -34,7 +110,11 @@ def process_video(task_id, filename):
         'events': 0, 
         'clips': [], 
         'log': [], 
-        'error': None
+        'error': None,
+        'input_res': None,
+        'output_res': None,
+        'input_fps': None,
+        'output_fps': None,
     }
     
     def my_callback(info):
@@ -42,6 +122,14 @@ def process_video(task_id, filename):
             tasks[task_id]['progress'] = info['progress']
         if 'events' in info:
             tasks[task_id]['events'] = info['events']
+        if 'input_res' in info:
+            tasks[task_id]['input_res'] = info['input_res']
+        if 'output_res' in info:
+            tasks[task_id]['output_res'] = info['output_res']
+        if 'input_fps' in info:
+            tasks[task_id]['input_fps'] = info['input_fps']
+        if 'output_fps' in info:
+            tasks[task_id]['output_fps'] = info['output_fps']
         if 'log' in info:
             tasks[task_id]['log'].append(info['log'])
             if len(tasks[task_id]['log']) > 50:
@@ -49,7 +137,7 @@ def process_video(task_id, filename):
 
     try:
         from main import run as run_main
-        run_main(
+        summary_result = run_main(
             input_path=input_path,
             out_folder=out_dir,
             device=config.YOLO_DEVICE,
@@ -58,39 +146,34 @@ def process_video(task_id, filename):
         tasks[task_id]['progress'] = 100
         tasks[task_id]['status'] = 'completed'
         
-        # Read event_log.txt for stats
-        log_path = os.path.join(out_dir, "event_log.txt")
-        stats = {}
-        if os.path.exists(log_path):
-            with open(log_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                processed_match = re.search(r'Processed\s*:\s*([\d:]+)', content)
-                if processed_match:
-                    stats['original_length'] = processed_match.group(1)
-                
-                extracted_match = re.search(r'Extracted\s*:\s*([\d:]+)', content)
-                if extracted_match:
-                    stats['extracted_length'] = extracted_match.group(1)
-                
-                input_mb_match = re.search(r'Input video\s*:\s*([\d\.]+\s*MB)', content)
-                if input_mb_match:
-                    stats['input_size'] = input_mb_match.group(1)
-                    
-                clips_mb_match = re.search(r'All clips\s*:\s*([\d\.]+\s*MB)', content)
-                if clips_mb_match:
-                    stats['output_size'] = clips_mb_match.group(1)
-                    
-                reduction_match = re.search(r'Size reduction\s*:\s*([\d\.]+%)', content)
-                if reduction_match:
-                    stats['reduction'] = reduction_match.group(1)
-
+        stats = extract_stats(out_dir)
+        if isinstance(summary_result, dict):
+            for k, v in summary_result.items():
+                if v and (k not in stats or not stats[k]):
+                    stats[k] = v
         tasks[task_id]['stats'] = stats
+
+        # Update metadata.json with stats
+        meta_path = os.path.join(out_dir, 'metadata.json')
+        meta = {}
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, 'r', encoding='utf-8') as mf:
+                    meta = json.load(mf)
+            except Exception:
+                pass
+        meta['stats'] = stats
+        try:
+            with open(meta_path, 'w', encoding='utf-8') as mf:
+                json.dump(meta, mf, indent=2)
+        except Exception:
+            pass
 
         # Look for clips
         clips = []
         if os.path.exists(out_dir):
             for f in os.listdir(out_dir):
-                if f.endswith('.mp4'):
+                if f.endswith('.mp4') and not f.endswith('.raw.mp4'):
                     clips.append(f)
         tasks[task_id]['clips'] = clips
             
@@ -132,13 +215,11 @@ def upload_file():
         # Save metadata for history
         out_dir = os.path.abspath(os.path.join(app.config['OUTPUT_FOLDER'], task_id))
         os.makedirs(out_dir, exist_ok=True)
-        import json
-        from datetime import datetime
-        with open(os.path.join(out_dir, 'metadata.json'), 'w') as f:
+        with open(os.path.join(out_dir, 'metadata.json'), 'w', encoding='utf-8') as f:
             json.dump({
                 'original_filename': file.filename,
                 'timestamp': datetime.now().isoformat()
-            }, f)
+            }, f, indent=2)
             
         thread = threading.Thread(target=process_video, args=(task_id, unique_filename))
         thread.daemon = True
@@ -151,9 +232,6 @@ def progress(task_id):
     if task_id in tasks:
         return jsonify(tasks[task_id])
     return jsonify({'error': 'Task not found'}), 404
-
-import json
-from datetime import datetime
 
 @app.route('/history')
 def get_history():
@@ -170,35 +248,19 @@ def get_history():
             meta_path = os.path.join(out_dir, "metadata.json")
             if os.path.exists(meta_path):
                 try:
-                    with open(meta_path, "r") as f:
+                    with open(meta_path, "r", encoding="utf-8") as f:
                         item['metadata'] = json.load(f)
                 except Exception:
                     pass
             
             # Read stats
-            log_path = os.path.join(out_dir, "event_log.txt")
-            if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    import re
-                    m = re.search(r'Processed\s*:\s*([\d:]+)', content)
-                    if m: item['stats']['original_length'] = m.group(1)
-                    
-                    m = re.search(r'Extracted\s*:\s*([\d:]+)', content)
-                    if m: item['stats']['extracted_length'] = m.group(1)
-                    
-                    m = re.search(r'Input video\s*:\s*([\d\.]+\s*MB)', content)
-                    if m: item['stats']['input_size'] = m.group(1)
-                    
-                    m = re.search(r'All clips\s*:\s*([\d\.]+\s*MB)', content)
-                    if m: item['stats']['output_size'] = m.group(1)
-                    
-                    m = re.search(r'Size reduction\s*:\s*([\d\.]+%)', content)
-                    if m: item['stats']['reduction'] = m.group(1)
+            item['stats'] = extract_stats(out_dir)
+            if not item['stats'] and 'stats' in item.get('metadata', {}):
+                item['stats'] = item['metadata']['stats']
 
             # Read clips
             for f in os.listdir(out_dir):
-                if f.endswith('.mp4'):
+                if f.endswith('.mp4') and not f.endswith('.raw.mp4'):
                     item['clips'].append(f)
                     
             if item['clips'] or item['stats']:
@@ -207,8 +269,6 @@ def get_history():
     # Sort history latest first
     history.sort(key=lambda x: x['metadata'].get('timestamp', ''), reverse=True)
     return jsonify(history)
-
-import shutil
 
 @app.route('/download/zip/<task_id>')
 def download_zip(task_id):

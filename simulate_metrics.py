@@ -478,7 +478,8 @@ def print_benchmark_tables(
     classes_str = "vehicles (car, bus, truck, motor), people, bicycle, suspicious objects"
     meta_rows = [
         ["Input Video File", f"{input_path.name}"],
-        ["Resolution & Native FPS", f"{width}x{height} @ {fps:.1f} FPS"],
+        ["Input Resolution & FPS", f"{width}x{height} @ {fps:.1f} FPS"],
+        ["Output Resolution & FPS", f"{width}x{height} @ {min(60.0, max(fps, float(config.OUTPUT_FPS)) * max(1.0, float(getattr(config, 'EVENT_SPEEDUP_FACTOR', 1.0)))):.1f} FPS"],
         ["Evaluated Frame Count", f"{total_frames} frames ({total_frames / fps:.2f} seconds)"],
         ["Inference Hardware", f"{device.upper()}"],
         ["System Architecture", "Single Deep-Learning Model (YOLOv8n) in 3-Stage Cascade"],
@@ -795,8 +796,10 @@ def main():
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "input_video": str(input_path),
             "frames_analyzed": len(frames),
-            "resolution": f"{width}x{height}",
-            "fps": fps,
+            "input_resolution": f"{width}x{height}",
+            "output_resolution": f"{width}x{height}",
+            "input_fps": round(fps, 2),
+            "output_fps": round(min(60.0, max(fps, float(config.OUTPUT_FPS)) * max(1.0, float(getattr(config, 'EVENT_SPEEDUP_FACTOR', 1.0)))), 2),
             "device": device,
             "system_classification": "Cascade Hybrid Pipeline (Single Deep-Learning Detector: YOLOv8n)",
         },

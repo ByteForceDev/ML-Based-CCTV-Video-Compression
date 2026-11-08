@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const processingProgressBar = document.getElementById('processing-progress-bar');
     const processingPercentage = document.getElementById('processing-percentage');
     const eventsDetected = document.getElementById('events-detected');
+    const videoStreamInfo = document.getElementById('video-stream-info');
     const logOutput = document.getElementById('log-output');
     
     const resultsContainer = document.getElementById('results-container');
@@ -42,13 +43,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if(this.files.length) handleFile(this.files[0]);
     });
 
+    function resetStats() {
+        document.getElementById('stat-orig-len').textContent = '--';
+        document.getElementById('stat-extracted-len').textContent = '--';
+        document.getElementById('stat-input-size').textContent = '--';
+        document.getElementById('stat-output-size').textContent = '--';
+        document.getElementById('stat-reduction').textContent = '--';
+        document.getElementById('stat-input-res').textContent = '--';
+        document.getElementById('stat-output-res').textContent = '--';
+        document.getElementById('stat-input-fps').textContent = '--';
+        document.getElementById('stat-output-fps').textContent = '--';
+    }
+
+    function populateStats(stats) {
+        if (!stats) {
+            resetStats();
+            return;
+        }
+        document.getElementById('stat-orig-len').textContent = stats.original_length || '--';
+        document.getElementById('stat-extracted-len').textContent = stats.extracted_length || '--';
+        document.getElementById('stat-input-size').textContent = stats.input_size || '--';
+        document.getElementById('stat-output-size').textContent = stats.output_size || '--';
+        document.getElementById('stat-reduction').textContent = stats.reduction || '--';
+        document.getElementById('stat-input-res').textContent = stats.input_resolution || '--';
+        document.getElementById('stat-output-res').textContent = stats.output_resolution || '--';
+        document.getElementById('stat-input-fps').textContent = stats.input_fps || '--';
+        document.getElementById('stat-output-fps').textContent = stats.output_fps || '--';
+    }
+
     function handleFile(file) {
         // Reset UI
         dropZone.classList.add('hidden');
         resultsContainer.classList.add('hidden');
         uploadProgressContainer.classList.remove('hidden');
         processingContainer.classList.add('hidden');
+        if (videoStreamInfo) {
+            videoStreamInfo.classList.add('hidden');
+            videoStreamInfo.textContent = '--';
+        }
         logOutput.innerHTML = "Waiting for output...";
+        resetStats();
         
         uploadFile(file);
     }
@@ -108,6 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     processingProgressBar.style.width = data.progress + '%';
                     processingPercentage.textContent = data.progress.toFixed(1) + '%';
                     eventsDetected.textContent = `${data.events} Events Detected`;
+
+                    if (data.input_res && data.input_fps && videoStreamInfo) {
+                        videoStreamInfo.textContent = `${data.input_res} @ ${data.input_fps} → Output: ${data.output_res || data.input_res} @ ${data.output_fps || data.input_fps}`;
+                        videoStreamInfo.classList.remove('hidden');
+                    }
                     
                     if (data.log && data.log.length > 0) {
                         logOutput.innerHTML = data.log.join('<br>');
@@ -118,19 +157,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         clearInterval(pollInterval);
                         
                         // Populate stats
-                        if (data.stats) {
-                            document.getElementById('stat-orig-len').textContent = data.stats.original_length || '--';
-                            document.getElementById('stat-extracted-len').textContent = data.stats.extracted_length || '--';
-                            document.getElementById('stat-input-size').textContent = data.stats.input_size || '--';
-                            document.getElementById('stat-output-size').textContent = data.stats.output_size || '--';
-                            document.getElementById('stat-reduction').textContent = data.stats.reduction || '--';
-                        }
+                        populateStats(data.stats);
                         
                         // Set download links
                         document.getElementById('btn-download-zip').href = `/download/zip/${taskId}`;
                         document.getElementById('btn-download-log').href = `/download/log/${taskId}`;
 
-                        showResults(data.clips, taskId);
+                        showResults(data.clips, taskId, data.stats);
+                        loadHistory(); // refresh history list
                     } else if (data.status === 'error') {
                         clearInterval(pollInterval);
                         alert("Processing Error: " + data.error);
@@ -142,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    function showResults(clips, taskId) {
+    function showResults(clips, taskId, stats) {
         processingContainer.classList.add('hidden');
         resultsContainer.classList.remove('hidden');
         dropZone.classList.remove('hidden'); // allow another upload
@@ -153,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clipsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 1.1rem; padding: 2rem;">No key events detected in the footage.</p>';
             return;
         }
+
+        const outRes = stats?.output_resolution || '';
+        const outFps = stats?.output_fps || '';
 
         clips.forEach(clip => {
             const clipUrl = `/output/${taskId}/${clip}`;
@@ -172,6 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const badgesHtml = components.map(c => `<span class="badge">${c.toUpperCase()}</span>`).join('');
+            const resBadgeHtml = outRes ? `<span class="badge badge-tech">${outRes}</span>` : '';
+            const fpsBadgeHtml = outFps ? `<span class="badge badge-tech">${outFps}</span>` : '';
 
             const card = document.createElement('div');
             card.className = 'clip-card';
@@ -184,6 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="clip-title">${clip.replace(/__/g, ' - ').replace(/_/g, ' ')}</div>
                     <div class="badges-row">
                         ${badgesHtml || '<span class="badge">EVENT</span>'}
+                        ${resBadgeHtml}
+                        ${fpsBadgeHtml}
                         <a href="${clipUrl}" download class="badge badge-download" style="margin-left: auto;">Download</a>
                     </div>
                 </div>
@@ -209,6 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const originalName = item.metadata.original_filename || item.task_id;
                     const dateStr = item.metadata.timestamp ? new Date(item.metadata.timestamp).toLocaleString() : 'Unknown Date';
                     const numClips = item.clips.length;
+                    const resBadge = item.stats?.output_resolution ? `<div class="hist-stat-badge">${item.stats.output_resolution}</div>` : '';
+                    const fpsBadge = item.stats?.output_fps ? `<div class="hist-stat-badge">${item.stats.output_fps}</div>` : '';
                     
                     const card = document.createElement('div');
                     card.className = 'history-card';
@@ -219,6 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="hist-stats">
                             <div class="hist-stat-badge">${numClips} Clips</div>
+                            ${resBadge}
+                            ${fpsBadge}
                             <div class="hist-stat-badge">${item.stats?.output_size || '-- MB'}</div>
                             <div class="hist-stat-badge" style="color:var(--success); font-weight: bold;">${item.stats?.reduction || '--%'} Reduced</div>
                             <button class="btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.8rem;">View</button>
@@ -226,26 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                     
                     card.addEventListener('click', () => {
-                        // Populate stats
-                        if (item.stats) {
-                            document.getElementById('stat-orig-len').textContent = item.stats.original_length || '--';
-                            document.getElementById('stat-extracted-len').textContent = item.stats.extracted_length || '--';
-                            document.getElementById('stat-input-size').textContent = item.stats.input_size || '--';
-                            document.getElementById('stat-output-size').textContent = item.stats.output_size || '--';
-                            document.getElementById('stat-reduction').textContent = item.stats.reduction || '--';
-                        } else {
-                            document.getElementById('stat-orig-len').textContent = '--';
-                            document.getElementById('stat-extracted-len').textContent = '--';
-                            document.getElementById('stat-input-size').textContent = '--';
-                            document.getElementById('stat-output-size').textContent = '--';
-                            document.getElementById('stat-reduction').textContent = '--';
-                        }
+                        populateStats(item.stats);
                         
                         // Set download links
                         document.getElementById('btn-download-zip').href = `/download/zip/${item.task_id}`;
                         document.getElementById('btn-download-log').href = `/download/log/${item.task_id}`;
                         
-                        showResults(item.clips, item.task_id);
+                        showResults(item.clips, item.task_id, item.stats);
                         
                         // Scroll to results
                         document.getElementById('results-container').scrollIntoView({ behavior: 'smooth' });

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IntelliVision | Smart CCTV Summariser</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=5">
 </head>
 <body>
     <div class="container">
@@ -52,6 +52,7 @@
                     </div>
                     <div class="progress-stats">
                         <span id="events-detected">0 Events Detected</span>
+                        <span id="video-stream-info" class="stream-info-badge hidden">--</span>
                     </div>
                     <div class="progress-bar-bg">
                         <div id="processing-progress-bar" class="progress-bar-fill processing-fill"></div>
@@ -92,6 +93,22 @@
                         <span class="stat-label">Size Reduction</span>
                         <span id="stat-reduction" class="stat-value reduction-highlight">--</span>
                     </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Input Resolution</span>
+                        <span id="stat-input-res" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Output Resolution</span>
+                        <span id="stat-output-res" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Input FPS</span>
+                        <span id="stat-input-fps" class="stat-value">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Output FPS</span>
+                        <span id="stat-output-fps" class="stat-value">--</span>
+                    </div>
                 </div>
 
                 <div id="clips-grid" class="clips-grid">
@@ -108,6 +125,6 @@
         </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=4"></script>
 </body>
 </html>

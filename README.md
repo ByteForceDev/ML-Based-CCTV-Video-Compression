@@ -358,7 +358,7 @@ Device note:
 Features of the UI:
 - **Drag & Drop Upload:** Upload CCTV footage (`.mp4`, `.avi`, `.mkv`).
 - **Real-time Processing Stats:** Watch deep-learning analysis progress live, updated continuously without blocking the UI.
-- **Advanced Statistical Breakdown:** Instantly view calculated metrics such as Original Video Length, Extracted Video Length, Total Input Size, Extracted Size, and Size Reduction Percentage.
+- **Advanced Statistical Breakdown:** Instantly view calculated metrics such as Original Video Length, Extracted Video Length, Total Input Size, Extracted Size, Size Reduction Percentage, Input Resolution, Output Resolution, Input FPS, and Output FPS.
 - **Dynamic Clips Gallery:** View all detected event chunks seamlessly in an interactive viewer directly on the page.
 - **Permanent Processing History:** The dashboard natively tracks processing metadata. All past extractions are dynamically cataloged in a "Previously Extracted Videos" list below the uploader. Click any prior item to instantly reload its stats, playback gallery, and downloads instantly without reprocessing.
 - **Downloads:** Easily download individual clips, an aggregate ZIP archive of all events, and comprehensive event logs containing size reduction statistics.
