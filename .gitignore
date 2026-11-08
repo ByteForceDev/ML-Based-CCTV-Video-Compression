@@ -43,7 +43,7 @@ env/
 Thumbs.db
 
 # Data files (large datasets)
-data/**
+# data/** (managed via Git LFS)
 
 # Model files (can be large)
 *.pkl
@@ -75,6 +75,16 @@ logs/
 *.avi
 *.mkv
 output/**
+
+# Allow data directory and video files for Git LFS
+!data/
+!data/**
+!data/*.mp4
+!data/*.avi
+!data/*.mkv
+!data/**/*.mp4
+!data/**/*.avi
+!data/**/*.mkv
 
 # Web App specifics
 uploads/
